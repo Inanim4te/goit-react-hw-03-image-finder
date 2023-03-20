@@ -3,33 +3,72 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import axios from 'axios';
 import { ImageGalleryItem } from './ImageGalleryItem/ImageGalleryItem';
+import Button from 'components/Button/Button';
+import Loader from 'components/Loader/Loader';
 
 export class ImageGallery extends Component {
   state = {
     pictures: [],
-    showModal: false,
-    currentPage: 0,
+    currentPage: 1,
+    error: null,
+    isLoading: false,
   };
-  // static propTypes = {second: third}
+  static propTypes = { picName: PropTypes.string.isRequired };
 
-  componentDidUpdate(prevProps, prevState) {
-    if (prevProps.picName !== this.props.picName) {
-      this.setState({ currentPage: 1, pictures: [] });
+  async componentDidUpdate(prevProps, prevState) {
+    const { picName } = this.props;
+    const { currentPage, pictures } = this.state;
+    if (prevProps.picName !== picName) {
+      this.setState({ isLoading: true, pictures: [] });
+      try {
+        await axios('https://pixabay.com/api/', {
+          params: {
+            key: '33649719-b7fecbfe979c6e7e0b54f5aa7',
+            q: picName,
+            image_type: 'photo',
+            orientation: 'horizontal',
+            safesearch: 'true',
+            page: 1,
+            per_page: 12,
+          },
+        }).then(res =>
+          this.setState({
+            pictures: res.data.hits,
+          })
+        );
+      } catch (error) {
+        this.setState({ error });
+      } finally {
+        this.setState({ isLoading: false });
+      }
     }
-    if (prevState.currentPage !== this.state.currentPage) {
-      axios('https://pixabay.com/api/', {
-        params: {
-          key: '33649719-b7fecbfe979c6e7e0b54f5aa7',
-          q: this.props.picName,
-          image_type: 'photo',
-          orientation: 'horizontal',
-          safesearch: 'true',
-          page: this.state.currentPage,
-          per_page: 12,
-        },
-      }).then(res =>
-        this.setState({ pictures: [...this.state.pictures, ...res.data.hits] })
-      );
+
+    if (
+      prevState.currentPage !== currentPage &&
+      prevProps.picName === picName
+    ) {
+      this.setState({ isLoading: true });
+      try {
+        await axios('https://pixabay.com/api/', {
+          params: {
+            key: '33649719-b7fecbfe979c6e7e0b54f5aa7',
+            q: picName,
+            image_type: 'photo',
+            orientation: 'horizontal',
+            safesearch: 'true',
+            page: currentPage,
+            per_page: 12,
+          },
+        }).then(res =>
+          this.setState({
+            pictures: [...pictures, ...res.data.hits],
+          })
+        );
+      } catch (error) {
+        this.setState({ error });
+      } finally {
+        this.setState({ isLoading: false });
+      }
     }
   }
 
@@ -39,28 +78,28 @@ export class ImageGallery extends Component {
     });
   };
 
-  handleModalToggle = e => {};
-
   render() {
+    const { pictures, isLoading } = this.state;
     return (
       <>
-        <ul className={css.ImageGallery}>
-          {this.state.pictures
-            ? this.state.pictures.map(el => {
-                return (
-                  <ImageGalleryItem
-                    key={el.id}
-                    webformatURL={el.webformatURL}
-                    largeImageURL={el.largeImageURL}
-                    tags={el.tags}
-                  />
-                );
-              })
-            : null}
-        </ul>
-        <button type="button" onClick={this.changePageHandler}>
-          Find more
-        </button>
+        {pictures.length ? (
+          <ul className={css.ImageGallery}>
+            {pictures.map(el => {
+              return (
+                <ImageGalleryItem
+                  key={el.id}
+                  webformatURL={el.webformatURL}
+                  largeImageURL={el.largeImageURL}
+                  tags={el.tags}
+                />
+              );
+            })}
+          </ul>
+        ) : null}
+        {isLoading && <Loader />}
+        {pictures.length ? (
+          <Button title="Load more" onClick={this.changePageHandler} />
+        ) : null}
       </>
     );
   }
